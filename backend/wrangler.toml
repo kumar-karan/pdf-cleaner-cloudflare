@@ -1,0 +1,4 @@
+name = "pdf-cleaner-api"
+main = "main.py"
+compatibility_date = "2024-04-03"
+compatibility_flags = ["python_workers"]

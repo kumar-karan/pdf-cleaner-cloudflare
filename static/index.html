@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Annotation Remover</title>
+    <!-- Outfit Font from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="radial-glow"></div>
+    
+    <div class="container">
+        <header>
+            <div class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <path d="m9 15 2 2 4-4"></path>
+                </svg>
+                <span>Aura PDF</span>
+            </div>
+            <h1>Remove Handwritten Annotations</h1>
+            <p class="subtitle">Instantly clean vector curves, notes, and highlights from your slides while preserving text, images, and layout. 100% free at the edge.</p>
+        </header>
+
+        <main>
+            <!-- Card Container -->
+            <div class="glass-card">
+                <!-- Step 1: Upload -->
+                <div id="upload-step" class="step-view active">
+                    <div id="drop-zone" class="drop-zone">
+                        <input type="file" id="file-input" accept=".pdf" style="display: none;">
+                        <div class="drop-zone-content">
+                            <div class="icon-wrapper">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="upload-icon">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <h3>Drag & drop your PDF here</h3>
+                            <p>or <span class="browse-link">browse files</span></p>
+                            <span class="file-limits">Supports files up to 100MB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Processing -->
+                <div id="processing-step" class="step-view">
+                    <div class="loader-wrapper">
+                        <div class="spinner">
+                            <div class="double-bounce1"></div>
+                            <div class="double-bounce2"></div>
+                        </div>
+                        <h3 id="status-title">Processing PDF</h3>
+                        <p id="status-desc" class="processing-desc">Analyzing pages and removing handwritten vector layers...</p>
+                        
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-glow"></div>
+                            <div class="progress-bar-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Result -->
+                <div id="result-step" class="step-view">
+                    <div class="result-content">
+                        <div class="success-icon-wrapper">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="success-icon">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                        </div>
+                        <h2>PDF Cleaned Successfully!</h2>
+                        
+                        <div class="file-details-card">
+                            <div class="file-info-row">
+                                <div class="file-info-label">File Name</div>
+                                <div id="result-filename" class="file-info-value">document_cleaned.pdf</div>
+                            </div>
+                            <div class="file-info-row">
+                                <div class="file-info-label">Original Size</div>
+                                <div id="result-orig-size" class="file-info-value">0 MB</div>
+                            </div>
+                            <div class="file-info-row">
+                                <div class="file-info-label">Cleaned Size</div>
+                                <div id="result-clean-size" class="file-info-value">0 MB</div>
+                            </div>
+                            <div class="file-info-row highlighted">
+                                <div class="file-info-label">File Size Reduction</div>
+                                <div id="result-reduction" class="file-info-value size-benefit">0%</div>
+                            </div>
+                        </div>
+
+                        <div class="actions-wrapper">
+                            <button id="download-btn" class="btn btn-primary btn-glow">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Download Cleaned PDF
+                            </button>
+                            <button id="restart-btn" class="btn btn-secondary">
+                                Clean Another File
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by Cloudflare Pages & Workers. Run serverless at the edge.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
