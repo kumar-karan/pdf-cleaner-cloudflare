@@ -1,7 +1,4 @@
-// API URL Configuration
-// If your backend Worker is deployed on a different domain, replace '/api/clean-pdf' with your Worker's full API URL.
-// Example: const API_URL = 'https://pdf-cleaner-api.karankumar.workers.dev/api/clean-pdf';
-const API_URL = '/api/clean-pdf';
+const API_URL = 'https://pdf-cleaner-api.campacola45.workers.dev';
 
 // DOM Elements
 const dropZone = document.getElementById('drop-zone');
@@ -89,18 +86,20 @@ async function uploadFile(file) {
 
     showStep('processing-step');
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
+        // Send file directly as binary body to avoid complex multipart parser in Cloudflare Worker
         const response = await fetch(API_URL, {
             method: 'POST',
-            body: formData
+            headers: {
+                'Content-Type': 'application/pdf',
+                'X-File-Name': file.name
+            },
+            body: file
         });
 
         if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.detail || 'Failed to process PDF.');
+            const errText = await response.text().catch(() => 'Failed to process PDF.');
+            throw new Error(errText);
         }
 
         // Get file data

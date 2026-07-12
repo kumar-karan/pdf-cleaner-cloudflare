@@ -1,104 +1,82 @@
 import io
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
-from fastapi.staticfiles import Mount
 import pypdf
+from js import Response, Headers
 
-app = FastAPI(title="PDF Annotation Remover API")
-
-# Enable CORS for frontend requests
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins (essential for Cloudflare Pages/Workers integration)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-def clean_page_content(page) -> bool:
-    """
-    Strips all path drawing operations from a page's content stream,
-    effectively removing handwritten notes and drawings while keeping text/images.
-    """
-    try:
-        contents = page.get_contents()
-        if not contents:
-            return False
+async def on_fetch(request, env):
+    # Enable CORS headers for cross-origin frontend requests
+    cors_headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, X-File-Name",
+        "Access-Control-Max-Age": "86400",
+    }
+    
+    # Handle preflight options request
+    if request.method == "OPTIONS":
+        return Response.new("", headers=Headers.new(cors_headers.items()))
+        
+    if request.method == "POST":
+        try:
+            # Read raw binary upload from body
+            array_buffer = await request.arrayBuffer()
+            file_bytes = bytes(array_buffer.to_py())
             
-        # PDF path-drawing and painting operators
-        path_operators = {
-            b'm', b'l', b'c', b'v', b'y', b're', b'h',
-            b'S', b's', b'f', b'F', b'f*', b'B', b'B*', b'b', b'b*', b'n'
-        }
-        
-        new_operations = []
-        for args, op in contents.operations:
-            if op in path_operators:
-                continue
-            new_operations.append((args, op))
+            if not file_bytes:
+                return Response.new("Empty file uploaded.", status=400, headers=Headers.new(cors_headers.items()))
+                
+            pdf_stream = io.BytesIO(file_bytes)
+            reader = pypdf.PdfReader(pdf_stream)
+            writer = pypdf.PdfWriter()
             
-        contents.operations = new_operations
-        return True
-    except Exception as e:
-        print(f"Error cleaning page: {e}")
-        return False
-
-@app.post("/api/clean-pdf")
-async def clean_pdf(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
-        
-    try:
-        # Read uploaded bytes into memory
-        file_bytes = await file.read()
-        pdf_stream = io.BytesIO(file_bytes)
-        
-        # Load PDF
-        reader = pypdf.PdfReader(pdf_stream)
-        writer = pypdf.PdfWriter()
-        
-        # Clean each page
-        for page in reader.pages:
-            clean_page_content(page)
-            writer.add_page(page)
+            # Clean each page of handwritten drawing layers
+            path_operators = {
+                b'm', b'l', b'c', b'v', b'y', b're', b'h',
+                b'S', b's', b'f', b'F', b'f*', b'B', b'B*', b'b', b'b*', b'n'
+            }
             
-        # Write output PDF in-memory
-        output_stream = io.BytesIO()
-        writer.write(output_stream)
-        output_bytes = output_stream.getvalue()
-        
-        original_size = len(file_bytes)
-        cleaned_size = len(output_bytes)
-        reduction = ((original_size - cleaned_size) / original_size) * 100 if original_size > 0 else 0
-        
-        # Create cleaned filename
-        base_name = file.filename
-        if base_name.lower().endswith(".pdf"):
-            base_name = base_name[:-4]
-        cleaned_filename = f"{base_name}_cleaned.pdf"
-        
-        headers = {
-            "Content-Disposition": f'attachment; filename="{cleaned_filename}"',
-            "X-Original-Size": str(original_size),
-            "X-Cleaned-Size": str(cleaned_size),
-            "X-Reduction-Percent": f"{reduction:.1f}",
-            "Access-Control-Expose-Headers": "X-Original-Size, X-Cleaned-Size, X-Reduction-Percent, Content-Disposition"
-        }
-        
-        return Response(
-            content=output_bytes,
-            media_type="application/pdf",
-            headers=headers
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {str(e)}")
-
-# Fallback for local serving of frontend static files
-# When deployed to Cloudflare, Pages will serve the static files, and Worker handles the API.
-# But locally, the FastAPI app can serve the frontend at root.
-try:
-    from fastapi.staticfiles import StaticFiles
-    app.mount("/", StaticFiles(directory="static", html=True), name="static")
-except Exception:
-    pass
+            for page in reader.pages:
+                contents = page.get_contents()
+                if contents:
+                    new_operations = []
+                    for args, op in contents.operations:
+                        if op in path_operators:
+                            continue
+                        new_operations.append((args, op))
+                    contents.operations = new_operations
+                writer.add_page(page)
+                
+            # Output clean PDF to memory
+            output_stream = io.BytesIO()
+            writer.write(output_stream)
+            output_bytes = output_stream.getvalue()
+            
+            original_size = len(file_bytes)
+            cleaned_size = len(output_bytes)
+            reduction = ((original_size - cleaned_size) / original_size) * 100 if original_size > 0 else 0
+            
+            # Get uploaded filename or default
+            filename = request.headers.get("X-File-Name") or "cleaned.pdf"
+            if not filename.lower().endswith(".pdf"):
+                filename += ".pdf"
+            else:
+                filename = filename[:-4] + "_cleaned.pdf"
+                
+            # Build success response
+            headers = dict(cors_headers)
+            headers.update({
+                "Content-Type": "application/pdf",
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Original-Size": str(original_size),
+                "X-Cleaned-Size": str(cleaned_size),
+                "X-Reduction-Percent": f"{reduction:.1f}",
+                "Access-Control-Expose-Headers": "X-Original-Size, X-Cleaned-Size, X-Reduction-Percent, Content-Disposition"
+            })
+            
+            return Response.new(output_bytes, headers=Headers.new(headers.items()))
+            
+        except Exception as e:
+            err_headers = dict(cors_headers)
+            return Response.new(f"Failed to process PDF: {str(e)}", status=500, headers=Headers.new(err_headers.items()))
+            
+    # Method Not Allowed
+    return Response.new("Method not allowed", status=405, headers=Headers.new(cors_headers.items()))
