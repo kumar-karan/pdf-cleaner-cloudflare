@@ -1,6 +1,6 @@
 import io
 import pypdf
-from js import Response, Headers
+from workers import Response
 
 async def on_fetch(request, env):
     # Enable CORS headers for cross-origin frontend requests
@@ -13,7 +13,7 @@ async def on_fetch(request, env):
     
     # Handle preflight options request
     if request.method == "OPTIONS":
-        return Response.new("", headers=Headers.new(cors_headers.items()))
+        return Response("", headers=cors_headers)
         
     if request.method == "POST":
         try:
@@ -22,7 +22,7 @@ async def on_fetch(request, env):
             file_bytes = bytes(array_buffer.to_py())
             
             if not file_bytes:
-                return Response.new("Empty file uploaded.", status=400, headers=Headers.new(cors_headers.items()))
+                return Response("Empty file uploaded.", status=400, headers=cors_headers)
                 
             pdf_stream = io.BytesIO(file_bytes)
             reader = pypdf.PdfReader(pdf_stream)
@@ -72,11 +72,12 @@ async def on_fetch(request, env):
                 "Access-Control-Expose-Headers": "X-Original-Size, X-Cleaned-Size, X-Reduction-Percent, Content-Disposition"
             })
             
-            return Response.new(output_bytes, headers=Headers.new(headers.items()))
+            # Use the official Cloudflare Workers Response class to handle Python bytes correctly
+            return Response(output_bytes, headers=headers)
             
         except Exception as e:
             err_headers = dict(cors_headers)
-            return Response.new(f"Failed to process PDF: {str(e)}", status=500, headers=Headers.new(err_headers.items()))
+            return Response(f"Failed to process PDF: {str(e)}", status=500, headers=err_headers)
             
     # Method Not Allowed
-    return Response.new("Method not allowed", status=405, headers=Headers.new(cors_headers.items()))
+    return Response("Method not allowed", status=405, headers=cors_headers)

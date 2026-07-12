@@ -85,56 +85,82 @@ async function uploadFile(file) {
     }
 
     showStep('processing-step');
+    
+    const statusDesc = document.getElementById('status-desc');
+    const progressBarFill = document.querySelector('.progress-bar-fill');
+    
+    // Reset state elements
+    progressBarFill.style.width = '0%';
+    progressBarFill.classList.remove('processing');
+    statusDesc.textContent = 'Uploading PDF... 0%';
 
-    try {
-        // Send file directly as binary body to avoid complex multipart parser in Cloudflare Worker
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/pdf',
-                'X-File-Name': file.name
-            },
-            body: file
-        });
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', API_URL);
+    xhr.responseType = 'blob'; // Receive response as a binary blob
+    
+    xhr.setRequestHeader('Content-Type', 'application/pdf');
+    xhr.setRequestHeader('X-File-Name', file.name);
 
-        if (!response.ok) {
-            const errText = await response.text().catch(() => 'Failed to process PDF.');
-            throw new Error(errText);
-        }
-
-        // Get file data
-        processedBlob = await response.blob();
-        
-        // Extract stats from headers (exposed via CORS Access-Control-Expose-Headers)
-        const origSize = parseInt(response.headers.get('X-Original-Size')) || file.size;
-        const cleanSize = parseInt(response.headers.get('X-Cleaned-Size')) || processedBlob.size;
-        const reductionPercent = response.headers.get('X-Reduction-Percent') || 
-            (((origSize - cleanSize) / origSize) * 100).toFixed(1);
-        
-        // Extract filename from disposition header or default
-        const disposition = response.headers.get('Content-Disposition');
-        let filename = '';
-        if (disposition && disposition.indexOf('attachment') !== -1) {
-            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-            const matches = filenameRegex.exec(disposition);
-            if (matches != null && matches[1]) { 
-                filename = matches[1].replace(/['"]/g, '');
+    // Track upload progress
+    xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            statusDesc.textContent = `Uploading PDF... ${percent}%`;
+            progressBarFill.style.width = `${percent}%`;
+            
+            if (percent === 100) {
+                statusDesc.textContent = 'Processing PDF... Analyzing pages and removing annotations';
+                progressBarFill.classList.add('processing');
             }
         }
-        processedFilename = filename || `${file.name.replace(/\.pdf$/i, '')}_cleaned.pdf`;
+    });
 
-        // Update results view
-        resultFilename.textContent = processedFilename;
-        resultOrigSize.textContent = formatBytes(origSize);
-        resultCleanSize.textContent = formatBytes(cleanSize);
-        resultReduction.textContent = `-${reductionPercent}%`;
+    xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+            processedBlob = xhr.response;
+            
+            // Extract stats from headers (exposed via CORS Access-Control-Expose-Headers)
+            const origSize = parseInt(xhr.getResponseHeader('X-Original-Size')) || file.size;
+            const cleanSize = parseInt(xhr.getResponseHeader('X-Cleaned-Size')) || processedBlob.size;
+            const reductionPercent = xhr.getResponseHeader('X-Reduction-Percent') || 
+                (((origSize - cleanSize) / origSize) * 100).toFixed(1);
+            
+            // Extract filename from disposition header or default
+            const disposition = xhr.getResponseHeader('Content-Disposition');
+            let filename = '';
+            if (disposition && disposition.indexOf('attachment') !== -1) {
+                const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                const matches = filenameRegex.exec(disposition);
+                if (matches != null && matches[1]) { 
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            }
+            processedFilename = filename || `${file.name.replace(/\.pdf$/i, '')}_cleaned.pdf`;
 
-        showStep('result-step');
-    } catch (error) {
-        alert(`Error: ${error.message}`);
+            // Update results view
+            resultFilename.textContent = processedFilename;
+            resultOrigSize.textContent = formatBytes(origSize);
+            resultCleanSize.textContent = formatBytes(cleanSize);
+            resultReduction.textContent = `-${reductionPercent}%`;
+
+            showStep('result-step');
+        } else {
+            // Read error text from blob
+            const reader = new FileReader();
+            reader.onload = () => {
+                alert(`Error: ${reader.result || 'Failed to process PDF.'}`);
+                showStep('upload-step');
+            };
+            reader.readAsText(xhr.response);
+        }
+    });
+
+    xhr.addEventListener('error', () => {
+        alert('Network error occurred during upload.');
         showStep('upload-step');
-        fileInput.value = '';
-    }
+    });
+
+    xhr.send(file);
 }
 
 // Download action

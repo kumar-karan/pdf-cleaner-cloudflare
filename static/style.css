@@ -252,19 +252,26 @@ h1 {
 
 .progress-bar-fill {
     height: 100%;
-    width: 40%;
+    width: 0%;
     background: linear-gradient(90deg, var(--primary) 0%, #3b82f6 100%);
     border-radius: 10px;
     position: absolute;
-    animation: progress-slide 1.5s infinite ease-in-out;
+    left: 0;
+    transition: width 0.2s ease-out;
 }
 
-@keyframes progress-slide {
-    0% {
-        left: -40%;
+.progress-bar-fill.processing {
+    width: 100%;
+    animation: progress-pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes progress-pulse {
+    0%, 100% {
+        opacity: 0.6;
     }
-    100% {
-        left: 100%;
+    50% {
+        opacity: 1;
+        background: linear-gradient(90deg, #3b82f6 0%, var(--primary) 100%);
     }
 }
 
